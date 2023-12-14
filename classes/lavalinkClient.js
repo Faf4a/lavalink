@@ -3,6 +3,11 @@ const { EventEmitter } = require("events");
 const chalk = require("chalk");
 
 class lavalinkManager extends EventEmitter {
+  /**
+   * Constructs a new instance of the LavalinkClient class.
+   * @param {Client} client - The aoi.js client.
+   * @param {Object} options - The options for the Lavalink client.
+   */
   constructor(client, options) {
     super();
     this.client = client;
