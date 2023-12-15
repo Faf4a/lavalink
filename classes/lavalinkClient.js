@@ -509,22 +509,8 @@ class lavalinkManager extends EventEmitter {
             if (["rotating", "vibrato", "tremolo", "lowpass", "nightcore", "karaoke", "audiooutput", "echo"].includes(filtertype)) {
               switch (filtertype) {
                 case "rotating":
-                  player.node.send({
-                    op: "filters",
-                    guildId: message.guild.id,
-                    equalizer: player.bands.map((gain, index) => {
-                      var Obj = {
-                        "band": 0,
-                        "gain": 0,
-                      };
-                      Obj.band = Number(index);
-                      Obj.gain = Number(gain)
-                      return Obj;
-                    }),
-                    rotation: {
-                      "rotationHz": 0.2,
-                    },
-                  });
+                  player.toggleRotating(...filterargs);
+                  player?.toggleEcho(delay = 0.4, decay = 0.1);
                   break;
                 case "vibrato":
                   player.toggleVibrato(...filterargs);
