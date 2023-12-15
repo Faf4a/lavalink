@@ -106,7 +106,7 @@ class lavalinkManager extends EventEmitter {
           player.node
         );
 
-        const next = result.tracks[(result.tracks[Math.floor(Math.random() * Math.floor(result.tracks.length))])];
+        const next = result.tracks[Math.floor(Math.random() * Math.floor(result.tracks.length))];
         if (!next) return;
 
         player.set("autoplay", {
