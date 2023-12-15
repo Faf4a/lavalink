@@ -105,7 +105,7 @@ class lavalinkManager extends EventEmitter {
           player.node
         );
 
-        const next = result.tracks[Math.floor(result.tracks.length / 10)];
+        const next = result.tracks[(response.tracks[Math.floor(Math.random() * Math.floor(response.tracks.length))])];
         if (!next) return;
 
         player.set("autoplay", {
@@ -121,7 +121,7 @@ class lavalinkManager extends EventEmitter {
           player.pause(false);
           await player.play({
             pause: false,
-            volume: 85,
+            volume: player.get("volume")?.level || 90,
             startTime: 0,
           });
         }
@@ -249,7 +249,7 @@ class lavalinkManager extends EventEmitter {
 
             await player.play({
               pause: false,
-              volume: 85,
+              player.get("volume")?.level || 90,
               startTime: 0,
             });
           }
@@ -564,6 +564,10 @@ class lavalinkManager extends EventEmitter {
           if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
   
           await player.setVolume(volume);
+
+          player.set("volume", {
+            level: volume
+          });
   
           data.result = returnVolume === "true" ? player.volume : "";
   
