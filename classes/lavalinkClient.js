@@ -137,11 +137,13 @@ class lavalinkManager extends EventEmitter {
           const channel = this.client.channels.cache.get(player.textChannel) || undefined;
           const guild = this.client.guilds.cache.get(player.guild) || undefined;
           if (!channel || !guild) return console.error(chalk.bgRed(" error ") + ` Event "${event}" triggered but channel or guild is ${chalk.gray("undefined")}`);
+          console.log(channel)
           await this.client.functionManager.interpreter(
             this.client,
             {
               guild,
               author: player.queue?.current.requester || undefined,
+              channel || undefined
             },
             [],
             { code },
