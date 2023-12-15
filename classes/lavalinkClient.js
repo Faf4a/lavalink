@@ -249,7 +249,7 @@ class lavalinkManager extends EventEmitter {
 
             await player.play({
               pause: false,
-              player.get("volume")?.level || 90,
+              volume: player.get("volume")?.level || 90,
               startTime: 0,
             });
           }
