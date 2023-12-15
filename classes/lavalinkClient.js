@@ -143,7 +143,7 @@ class lavalinkManager extends EventEmitter {
             {
               guild,
               author: player.queue?.current.requester || undefined,
-              channel || undefined
+              channel: channel || undefined
             },
             [],
             { code },
