@@ -509,7 +509,22 @@ class lavalinkManager extends EventEmitter {
             if (["rotating", "vibrato", "tremolo", "lowpass", "nightcore", "karaoke", "audiooutput", "echo"].includes(filtertype)) {
               switch (filtertype) {
                 case "rotating":
-                  player.toggleRotating(...filterargs);
+                  player.node.send({
+                    op: "filters",
+                    guildId: message.guild.id,
+                    equalizer: player.bands.map((gain, index) => {
+                      var Obj = {
+                        "band": 0,
+                        "gain": 0,
+                      };
+                      Obj.band = Number(index);
+                      Obj.gain = Number(gain)
+                      return Obj;
+                    }),
+                    rotation: {
+                      "rotationHz": 0.2,
+                    },
+                  });
                   break;
                 case "vibrato":
                   player.toggleVibrato(...filterargs);
@@ -532,6 +547,26 @@ class lavalinkManager extends EventEmitter {
                 case "echo":
                   player.toggleEcho(...filterargs);
                   break;
+                case "bassboost":
+                  player.node.send({
+                    op: "filters",
+                    guildId: d.message.guild.id,
+                    equalizer: player.bands.map((gain, index) => {
+                      var Obj = {
+                        "band": 0,
+                        "gain": 0,
+                      };
+                      Obj.band = Number(index);
+                      Obj.gain = Number(gain)
+                      return Obj;
+                    }),
+                    timescale: {
+                      "speed": 1.0,
+                      "pitch": 1.0,
+                      "rate": 1.0
+                    },
+                  });
+                  break;
                 default:
                   break;
               }
@@ -540,6 +575,27 @@ class lavalinkManager extends EventEmitter {
 
           data.result = returnFilters === "true" ? JSON.stringify(player.filters) : "";
 
+          return {
+            code: d.util.setCode(data),
+          };
+        },
+      },
+      {
+        name: "$clearFilters",
+        usage: "$clearFilters",
+        input: [],
+        type: "djs",
+        code: async (d) => {
+          const data = await d.util.aoiFunc(d);
+    
+          const player = await d.client.lavalinkManager.players.get(d.guild.id);
+          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
+  
+          await player.resetFilters();
+  
+          data.result = "";
+  
           return {
             code: d.util.setCode(data),
           };
