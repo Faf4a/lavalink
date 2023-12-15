@@ -94,6 +94,7 @@ class lavalinkManager extends EventEmitter {
         if (!player) return;
         if (player?.get("autoplay")?.enabled !== true) return;
         const previous = player.queue.previous || player.get("autoplay").previous;
+        const volume = player.get("volume")?.level || 90;
         if (!previous) return;
 
         const result = await this.client.lavalinkManager.search(
@@ -121,7 +122,7 @@ class lavalinkManager extends EventEmitter {
           player.pause(false);
           await player.play({
             pause: false,
-            volume: player.get("volume")?.level || 90,
+            volume,
             startTime: 0,
           });
         }
@@ -223,6 +224,7 @@ class lavalinkManager extends EventEmitter {
           if (!player) return d.aoiError.fnError(d, "custom", {}, "lavalinkManager is not initalized");
 
           const playlist = query.includes("&list=");
+          const volume = player.get("volume")?.level || 90;
 
           const result = await d.client.lavalinkManager.search(
             { query, source },
@@ -249,7 +251,7 @@ class lavalinkManager extends EventEmitter {
 
             await player.play({
               pause: false,
-              volume: player.get("volume")?.level || 90,
+              volume,
               startTime: 0,
             });
           }
