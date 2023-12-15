@@ -510,7 +510,7 @@ class lavalinkManager extends EventEmitter {
               switch (filtertype) {
                 case "rotating":
                   player.toggleRotating(...filterargs);
-                  player?.toggleEcho(delay = 0.4, decay = 0.1);
+                  //player?.toggleEcho( delay = 0.4, decay = 0.1 );
                   break;
                 case "vibrato":
                   player.toggleVibrato(...filterargs);
@@ -538,13 +538,13 @@ class lavalinkManager extends EventEmitter {
                     op: "filters",
                     guildId: d.message.guild.id,
                     equalizer: player.bands.map((gain, index) => {
-                      var Obj = {
+                      var obj = {
                         "band": 0,
                         "gain": 0,
                       };
-                      Obj.band = Number(index);
-                      Obj.gain = Number(gain)
-                      return Obj;
+                      obj.band = Number(index);
+                      obj.gain = Number(gain)
+                      return obj;
                     }),
                     timescale: {
                       "speed": 1.0,
