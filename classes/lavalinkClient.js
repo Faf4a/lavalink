@@ -117,7 +117,6 @@ class lavalinkManager extends EventEmitter {
         });
 
         await player.queue.add(next);
-        await player.queue.add(result.tracks[Math.floor(Math.random() * Math.floor(result.tracks.length))])
 
         if (!player.playing && (player.queue?.size || 0) === 0) {
           player.pause(false);
@@ -127,6 +126,8 @@ class lavalinkManager extends EventEmitter {
             startTime: 0,
           });
         }
+        
+        player.queue.add(result.tracks[Math.floor(Math.random() * Math.floor(result.tracks.length))])
       });
 
     this.events.forEach((event) => {
