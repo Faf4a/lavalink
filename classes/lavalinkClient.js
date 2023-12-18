@@ -703,6 +703,44 @@ class lavalinkManager extends EventEmitter {
         },
       },
       {
+        name: "$queue",
+        usage: "$queue[limit;separator;format]",
+        input: ["limit", "separator", "format"],
+        type: "djs",
+        code: async (d) => {
+          const data = await d.util.aoiFunc(d);
+
+          const player = await d.client.lavalinkManager.players.get(d.guild.id);
+          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
+
+          let [limit, separator = ",\n", format = "{title} requested by {requester}"] = data.inside.splits;
+          limit = limit ? parseInt(limit) : player.queue.length;
+
+          data.result = player.queue.slice(0, limit).map(track => {
+            const keys = Object.keys(track).filter(key => key !== "requester");
+            const requester = Object.keys(track.requester);
+
+            keys.forEach(key => {
+              format = format.replace(`{${key}}`, track[key]);
+            });
+            
+            requester.forEach(key => {
+              format = format.replace(`{requester.${key}}`, track.requester[key]);
+              format = format.replace(`{requester}`, track.requester);
+            });
+
+            //i know this isnt the best way but i'm too lazy to do it properly currently
+            
+            return format;
+          }).join(separator);
+          
+          return {
+            code: d.util.setCode(data),
+          };
+        },
+      },
+      {
         name: "$autoPlay",
         usage: "$autoPlay[source]",
         input: ["source"],
