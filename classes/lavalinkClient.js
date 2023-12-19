@@ -44,8 +44,8 @@ class lavalinkManager extends EventEmitter {
           password: this.options.password,
           retryDelay: 2500,
           retryAmount: this.options.retryAmount || 7,
-          version: "v3",
-          useVersionPath: true,
+         // version: "v4",
+        // useVersionPath: true,
           secure: this.options.secure,
         },
       ],
@@ -347,12 +347,12 @@ class lavalinkManager extends EventEmitter {
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
           if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
-          if (player.queue.length < 1) { data.result = undefined; return { code: d.util.setCode(data) }}
+          //if (player.queue.length < 1) { data.result = undefined; return { code: d.util.setCode(data) }}
 
           if (player?.get("autoplay")?.enabled === true) {
             await player.set("autoplay", {
               requester: player.queue.current.requester,
-              source: "youtube",
+              source: player.queue.current.sourceName,
               previous: player.queue?.current,
               enabled: true,
             });
@@ -390,7 +390,7 @@ class lavalinkManager extends EventEmitter {
           if (player?.get("autoplay")?.enabled === true) {
             await player.set("autoplay", {
               requester: player.queue.current.requester,
-              source: "youtube",
+              source: player.queue.current.sourceName,
               previous: player.queue?.current,
               enabled: true,
             });
