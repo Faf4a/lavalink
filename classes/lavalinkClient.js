@@ -181,12 +181,12 @@ class lavalinkManager extends EventEmitter {
     this.client.functionManager.createFunction(
       {
         name: "$joinVoice",
-        usage: "$joinVoice[voiceId;returnChannel?]",
-        input: ["voiceId", "returnChannel?"],
+        usage: "$joinVoice[voiceId;selfDeafen?;selfMute?;instaFilters?;returnChannel?]",
+        input: ["voiceId", "selfDeafen", "selfMute", "instaFilters", "returnChannel?"],
         type: "djs",
         code: async (d) => {
           const data = await d.util.aoiFunc(d);
-          let [ voiceId = d.message?.member.voice.channelId, returnChannel = "false" ] = data.inside.splits;
+          let [ voiceId = d.message?.member.voice.channelId, selfDeafen = "true", selfMute = "false", instaFilters = "true", returnChannel = "false" ] = data.inside.splits;
           const voice = await d.util.getChannel(d, voiceId);
 
           if (!voice) return d.aoiError.fnError(d, "custom", { inside: data.inside }, "voice channel");
@@ -197,10 +197,10 @@ class lavalinkManager extends EventEmitter {
             guild: voice.guildId,
             voiceChannel: voice.id,
             textChannel: d.message.channel?.id,
-            selfMute: false,
-            selfDeafen: true,
+            selfMute: selfMute === "true" ? true : false,
+            selfDeafen: selfDeafen === "true" ? true : false,
             region: voice?.rtcRegion || undefined,
-            instaUpdateFiltersFix: true,
+            instaUpdateFiltersFix: instaFilters === "true" ? true : false,
           });
 
           if (!player.connected) await player.connect();
