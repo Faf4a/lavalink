@@ -20,8 +20,9 @@ class lavalinkManager extends EventEmitter {
     this.createFunctions();
   }
 
-  async addEvent(eventName, code) {
-    this.customEvents[eventName] = code;
+  async addEvent(eventName, options) {
+    this.customEvents[eventName] = { code: options.code, channel: options.channel ?? "default" };
+    console.log(this.customEvents);
   }
 
   async connect() {
@@ -135,8 +136,8 @@ class lavalinkManager extends EventEmitter {
         event,
         async (player, node, reason, payload, initChannel, newChannel) => {
           const code = this.customEvents[event]?.code;
-          if (!code) return;
-          const channel = this.client.channels.cache.get(player.textChannel) || undefined;
+          const channel = this.client.channels.cache.get(this.customEvents[event]?.channel) || this.client.channels.cache.get(player.textChannel) || undefined;
+          if (!code) return console.error(chalk.bgRed(" error ") + ` Event "${event}" triggered but code is ${chalk.gray("undefined")}`);
           const guild = this.client.guilds.cache.get(player.guild) || undefined;
           if (!channel || !guild) return console.error(chalk.bgRed(" error ") + ` Event "${event}" triggered but channel or guild is ${chalk.gray("undefined")}`);
           await this.client.functionManager.interpreter(
@@ -166,7 +167,6 @@ class lavalinkManager extends EventEmitter {
       clientId: this.client.user.id,
     });
 
-    // DO NOT REMOVE THIS, I DONT KNOW WHY, BUT DO NOT TOUCH IT.
     this.client.on("raw", (data) => {
       switch (data.t) {
         case "VOICE_SERVER_UPDATE":
@@ -290,8 +290,8 @@ class lavalinkManager extends EventEmitter {
         },
       },
       {
-        name: "$loop",
-        usage: "$loop[type]",
+        name: "$loopMode",
+        usage: "$loopMode[type]",
         input: ["type"],
         type: "djs",
         code: async (d) => {
