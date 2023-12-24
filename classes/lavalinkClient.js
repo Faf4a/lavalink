@@ -1,7 +1,8 @@
 const { Manager } = require("erela.js");
 const { EventEmitter } = require("events");
 const chalk = require("chalk");
-
+const fs = require("fs");
+const path = require("path");
 class lavalinkManager extends EventEmitter {
   /**
    * Constructs a new instance of the LavalinkClient class.
@@ -20,9 +21,13 @@ class lavalinkManager extends EventEmitter {
     this.createFunctions();
   }
 
-  async addEvent(eventName, options) {
-    this.customEvents[eventName] = { code: options.code, channel: options.channel ?? "default" };
-    console.log(this.customEvents);
+  async addEvent(event, options) {
+    this.customEvents[event] = {
+      name: options.name ?? event,
+      type: event,
+      code: options.code,
+      channel: options.channel ?? "default",
+    };
   }
 
   async connect() {
@@ -33,6 +38,8 @@ class lavalinkManager extends EventEmitter {
         }, 100);
       });
     });
+
+    const __dir = this.client?.loader.paths[0]?.path ?? undefined;
 
     this.client.lavalinkManager = new Manager({
       user: this.client.user.id,
@@ -45,8 +52,8 @@ class lavalinkManager extends EventEmitter {
           password: this.options.password,
           retryDelay: 2500,
           retryAmount: this.options.retryAmount || 7,
-         // version: "v4",
-        // useVersionPath: true,
+          // version: "v4",
+          // useVersionPath: true,
           secure: this.options.secure,
         },
       ],
@@ -56,6 +63,34 @@ class lavalinkManager extends EventEmitter {
         guild.shard.send(payload);
       },
     });
+
+    if (__dir) {
+      const events = ["nodeCreate", "nodeReconnect", "nodeDisconnect", "nodeConnect", "nodeError", "nodeRaw", "playerCreate", "playerDestroy", "queueEnd", "playerMove", "playerDisconnect", "trackStart", "trackEnd", "trackStuck", "trackError", "socketClosed"]
+      fs.readdir(__dir, async (err, files) => {
+        if (err) {
+          return console.error(chalk.bgRed.whiteBright(` error `) + ` Failed to load events with reason: ${err}`)
+        }
+    
+        for (const file of files) {
+          const __path = path.join(__dir, file);
+          try {
+            const event = require(__path);
+            if (event && event.type && event.code) {
+              if (events.includes(event.type)) {
+                this.customEvents[event.type] = {
+                  name: event?.name ?? event.type,
+                  type: event.type,
+                  code: event.code,
+                  channel: event?.channel ?? "default",
+                }
+              }
+            }
+          } catch (err) {
+            return console.error(chalk.bgRed.whiteBright(` error `) + ` Failed to load events with reason: ${err}`)
+          }
+        }
+      });
+    }
 
     this.client.lavalinkManager
       .on("nodeConnect", (node) => {
@@ -94,7 +129,8 @@ class lavalinkManager extends EventEmitter {
       .on("queueEnd", async (player) => {
         if (!player) return;
         if (player?.get("autoplay")?.enabled !== true) return;
-        const previous = player.queue.previous || player.get("autoplay").previous;
+        const previous =
+          player.queue.previous || player.get("autoplay").previous;
         const volume = player.get("volume")?.level || 90;
         if (!previous) return;
 
@@ -107,7 +143,10 @@ class lavalinkManager extends EventEmitter {
           player.node
         );
 
-        const next = result.tracks[Math.floor(Math.random() * Math.floor(result.tracks.length))];
+        const next =
+          result.tracks[
+            Math.floor(Math.random() * Math.floor(result.tracks.length))
+          ];
         if (!next) return;
 
         player.set("autoplay", {
@@ -127,8 +166,12 @@ class lavalinkManager extends EventEmitter {
             startTime: 0,
           });
         }
-        
-        player.queue.add(result.tracks[Math.floor(Math.random() * Math.floor(result.tracks.length))])
+
+        player.queue.add(
+          result.tracks[
+            Math.floor(Math.random() * Math.floor(result.tracks.length))
+          ]
+        );
       });
 
     this.events.forEach((event) => {
@@ -136,16 +179,31 @@ class lavalinkManager extends EventEmitter {
         event,
         async (player, node, reason, payload, initChannel, newChannel) => {
           const code = this.customEvents[event]?.code;
-          const channel = this.client.channels.cache.get(this.customEvents[event]?.channel) || this.client.channels.cache.get(player.textChannel) || undefined;
-          if (!code) return console.error(chalk.bgRed(" error ") + ` Event "${event}" triggered but code is ${chalk.gray("undefined")}`);
+          const channel =
+            this.client.channels.cache.get(this.customEvents[event]?.channel) ||
+            this.client.channels.cache.get(player.textChannel) ||
+            undefined;
+          if (!code)
+            return console.error(
+              chalk.bgRed(" error ") +
+                ` Event "${event}" triggered but code is ${chalk.gray(
+                  "undefined"
+                )}`
+            );
           const guild = this.client.guilds.cache.get(player.guild) || undefined;
-          if (!channel || !guild) return console.error(chalk.bgRed(" error ") + ` Event "${event}" triggered but channel or guild is ${chalk.gray("undefined")}`);
+          if (!channel || !guild)
+            return console.error(
+              chalk.bgRed(" error ") +
+                ` Event "${event}" triggered but channel or guild is ${chalk.gray(
+                  "undefined"
+                )}`
+            );
           await this.client.functionManager.interpreter(
             this.client,
             {
               guild,
               author: player.queue?.current.requester || undefined,
-              channel: channel || undefined
+              channel: channel || undefined,
             },
             [],
             { code },
@@ -156,7 +214,7 @@ class lavalinkManager extends EventEmitter {
             channel,
             true
           );
-          if (this.options.debug === true) { console.log(`Event "${event}" triggered`) };
+          if (Boolean(this.options.debug) === true) console.log(`Event "${event}" triggered`);
         }
       );
     });
@@ -166,6 +224,9 @@ class lavalinkManager extends EventEmitter {
       clientName: this.client.user.username,
       clientId: this.client.user.id,
     });
+
+    this.client.lavalinkManager.commands = this.customEvents;
+    if (Boolean(this.options.debug) === true && this.customEvents.length !== 0) console.log(chalk.bgGreen(" custom events ") + ` Loaded ${Object.keys(this.client.lavalinkManager.commands).length} custom events`);
 
     this.client.on("raw", (data) => {
       switch (data.t) {
@@ -181,15 +242,34 @@ class lavalinkManager extends EventEmitter {
     this.client.functionManager.createFunction(
       {
         name: "$joinVoice",
-        usage: "$joinVoice[voiceId;selfDeafen?;selfMute?;instaFilters?;returnChannel?]",
-        input: ["voiceId", "selfDeafen", "selfMute", "instaFilters", "returnChannel?"],
+        usage:
+          "$joinVoice[voiceId;selfDeafen?;selfMute?;instaFilters?;returnChannel?]",
+        input: [
+          "voiceId",
+          "selfDeafen",
+          "selfMute",
+          "instaFilters",
+          "returnChannel?",
+        ],
         type: "djs",
         code: async (d) => {
           const data = await d.util.aoiFunc(d);
-          let [ voiceId = d.message?.member.voice.channelId, selfDeafen = "true", selfMute = "false", instaFilters = "true", returnChannel = "false" ] = data.inside.splits;
+          let [
+            voiceId = d.message?.member.voice.channelId,
+            selfDeafen = "true",
+            selfMute = "false",
+            instaFilters = "true",
+            returnChannel = "false",
+          ] = data.inside.splits;
           const voice = await d.util.getChannel(d, voiceId);
 
-          if (!voice) return d.aoiError.fnError(d, "custom", { inside: data.inside }, "voice channel");
+          if (!voice)
+            return d.aoiError.fnError(
+              d,
+              "custom",
+              { inside: data.inside },
+              "voice channel"
+            );
 
           //await player?.destroy();
 
@@ -218,10 +298,17 @@ class lavalinkManager extends EventEmitter {
         type: "djs",
         code: async (d) => {
           const data = await d.util.aoiFunc(d);
-          let [query, source = "youtube", guildId = d.guild?.id] = data.inside.splits;
+          let [query, source = "youtube", guildId = d.guild?.id] =
+            data.inside.splits;
 
           const player = await d.client.lavalinkManager.players.get(guildId);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "lavalinkManager is not initalized");
+          if (!player)
+            return d.aoiError.fnError(
+              d,
+              "custom",
+              {},
+              "lavalinkManager is not initalized"
+            );
 
           const playlist = query.includes("&list=");
           const volume = player.get("volume")?.level || 90;
@@ -239,10 +326,16 @@ class lavalinkManager extends EventEmitter {
           const size = player.queue?.size || 0;
 
           if (playlist) {
-            if (!result.tracks.length) { data.result = undefined; return { code: d.util.setCode(data) }}
+            if (!result.tracks.length) {
+              data.result = undefined;
+              return { code: d.util.setCode(data) };
+            }
             await player.queue.add([...result.tracks]);
           } else {
-            if (!result.tracks[0]) { data.result = undefined; return { code: d.util.setCode(data) }}
+            if (!result.tracks[0]) {
+              data.result = undefined;
+              return { code: d.util.setCode(data) };
+            }
             await player.queue.add(result.tracks[0]);
           }
 
@@ -273,8 +366,15 @@ class lavalinkManager extends EventEmitter {
           let [property, index = 0] = data.inside.splits;
 
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", { inside: data.inside }, "Not connected / no lavalink instance");
-          if (player?.queue?.length !== 0 && !player?.queue?.current) return d.aoiError.fnError(d, "custom", {}, "Queue is empty");
+          if (!player)
+            return d.aoiError.fnError(
+              d,
+              "custom",
+              { inside: data.inside },
+              "Not connected / no lavalink instance"
+            );
+          if (player?.queue?.length !== 0 && !player?.queue?.current)
+            return d.aoiError.fnError(d, "custom", {}, "Queue is empty");
 
           if (index == 0) {
             data.result = player.queue?.current[property] || "";
@@ -299,8 +399,12 @@ class lavalinkManager extends EventEmitter {
           let [type = "track"] = data.inside.splits;
 
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
 
           type = type.toLowerCase();
 
@@ -325,16 +429,24 @@ class lavalinkManager extends EventEmitter {
           const data = await d.util.aoiFunc(d);
 
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
 
-          const state = player.queueRepeat ? "queue" : player.trackRepeat ? "track" : "none";
+          const state = player.queueRepeat
+            ? "queue"
+            : player.trackRepeat
+            ? "track"
+            : "none";
           data.result = state;
 
           return {
             code: d.util.setCode(data),
           };
-        }
+        },
       },
       {
         name: "$skipTrack",
@@ -345,8 +457,12 @@ class lavalinkManager extends EventEmitter {
           const data = await d.util.aoiFunc(d);
 
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
           //if (player.queue.length < 1) { data.result = undefined; return { code: d.util.setCode(data) }}
 
           if (player?.get("autoplay")?.enabled === true) {
@@ -380,9 +496,16 @@ class lavalinkManager extends EventEmitter {
           if (!track) return d.aoiError.fnError(d, "custom", {}, "track");
 
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
-          if (player.queue.length < 1) { data.result = undefined; return { code: d.util.setCode(data) }}
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
+          if (player.queue.length < 1) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
 
           await player.queue.remove(0, Number(track) - 1);
           await player.stop();
@@ -410,24 +533,37 @@ class lavalinkManager extends EventEmitter {
         type: "djs",
         code: async (d) => {
           const data = await d.util.aoiFunc(d);
-  
+
           let [ms] = data.inside.splits;
 
           ms = parseInt(Math.abs(ms));
-  
+
           if (!ms) return d.aoiError.fnError(d, "custom", {}, "ms");
-  
+
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
-          if (player.queue?.length < 1) { data.result = undefined; return { code: d.util.setCode(data) }}
-          if (player.queue?.current.isSeekable === false) { data.result = undefined; return { code: d.util.setCode(data) }}
-          if (player.queue?.current.length > ms) { data.result = undefined; return { code: d.util.setCode(data) }}
-  
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
+          if (player.queue?.length < 1) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
+          if (player.queue?.current.isSeekable === false) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
+          if (player.queue?.current.length > ms) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
+
           await player.seek(ms);
-  
+
           data.result = "";
-  
+
           return {
             code: d.util.setCode(data),
           };
@@ -440,23 +576,33 @@ class lavalinkManager extends EventEmitter {
         type: "djs",
         code: async (d) => {
           const data = await d.util.aoiFunc(d);
-  
+
           let [position] = data.inside.splits;
 
           position = parseInt(Math.abs(position));
-  
+
           if (!position) return d.aoiError.fnError(d, "custom", {}, "position");
-  
+
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
-          if (player.queue?.length < 1) { data.result = undefined; return { code: d.util.setCode(data) }}
-          if (player.queue?.lenght < position) { data.result = undefined; return { code: d.util.setCode(data) }}
-  
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
+          if (player.queue?.length < 1) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
+          if (player.queue?.lenght < position) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
+
           await player.queue.remove(position);
-  
+
           data.result = "";
-  
+
           return {
             code: d.util.setCode(data),
           };
@@ -475,8 +621,12 @@ class lavalinkManager extends EventEmitter {
           if (!track) return d.aoiError.fnError(d, "custom", {}, "track");
 
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
 
           data.result = player.filters?.[type] || player.filters;
 
@@ -495,10 +645,16 @@ class lavalinkManager extends EventEmitter {
           const [filterType, returnFilters = "false"] = data.inside.splits;
 
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
 
-          const filters = filterType.split(";").map((filter) => filter.trim().toLowerCase());
+          const filters = filterType
+            .split(";")
+            .map((filter) => filter.trim().toLowerCase());
 
           filters.forEach((filter) => {
             const parts = filter.split(":");
@@ -508,7 +664,18 @@ class lavalinkManager extends EventEmitter {
               return param;
             });
 
-            if (["rotating", "vibrato", "tremolo", "lowpass", "nightcore", "karaoke", "audiooutput", "echo"].includes(filtertype)) {
+            if (
+              [
+                "rotating",
+                "vibrato",
+                "tremolo",
+                "lowpass",
+                "nightcore",
+                "karaoke",
+                "audiooutput",
+                "echo",
+              ].includes(filtertype)
+            ) {
               switch (filtertype) {
                 case "rotating":
                   player.toggleRotating(...filterargs);
@@ -541,17 +708,17 @@ class lavalinkManager extends EventEmitter {
                     guildId: d.message.guild.id,
                     equalizer: player.bands.map((gain, index) => {
                       var obj = {
-                        "band": 0,
-                        "gain": 0,
+                        band: 0,
+                        gain: 0,
                       };
                       obj.band = Number(index);
-                      obj.gain = Number(gain)
+                      obj.gain = Number(gain);
                       return obj;
                     }),
                     timescale: {
-                      "speed": 1.0,
-                      "pitch": 1.0,
-                      "rate": 1.0
+                      speed: 1.0,
+                      pitch: 1.0,
+                      rate: 1.0,
                     },
                   });
                   break;
@@ -561,7 +728,8 @@ class lavalinkManager extends EventEmitter {
             }
           });
 
-          data.result = returnFilters === "true" ? JSON.stringify(player.filters) : "";
+          data.result =
+            returnFilters === "true" ? JSON.stringify(player.filters) : "";
 
           return {
             code: d.util.setCode(data),
@@ -575,15 +743,19 @@ class lavalinkManager extends EventEmitter {
         type: "djs",
         code: async (d) => {
           const data = await d.util.aoiFunc(d);
-    
+
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
-  
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
+
           await player.resetFilters();
-  
+
           data.result = "";
-  
+
           return {
             code: d.util.setCode(data),
           };
@@ -596,25 +768,29 @@ class lavalinkManager extends EventEmitter {
         type: "djs",
         code: async (d) => {
           const data = await d.util.aoiFunc(d);
-  
+
           let [volume, returnVolume = "false"] = data.inside.splits;
 
           volume = parseInt(Math.abs(volume));
-  
+
           if (!volume) return d.aoiError.fnError(d, "custom", {}, "volume");
-  
+
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
-  
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
+
           await player.setVolume(volume);
 
           player.set("volume", {
-            level: volume
+            level: volume,
           });
-  
+
           data.result = returnVolume === "true" ? player.volume : "";
-  
+
           return {
             code: d.util.setCode(data),
           };
@@ -628,21 +804,31 @@ class lavalinkManager extends EventEmitter {
         code: async (d) => {
           const data = await d.util.aoiFunc(d);
 
-          const [returnQueue = "false", returnOldQueue = "false"] = data.inside.splits;
-      
+          const [returnQueue = "false", returnOldQueue = "false"] =
+            data.inside.splits;
+
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
 
           player.set("shuffle", {
-            queueOld: player.queue.map(track => track),
+            queueOld: player.queue.map((track) => track),
             enabled: true,
-          })
-  
+          });
+
           await player.queue.shuffle();
-  
-          data.result = returnQueue === "true" ? player.queue : returnOldQueue === "true" ? player.get("shuffle").queueOld : "";
-  
+
+          data.result =
+            returnQueue === "true"
+              ? player.queue
+              : returnOldQueue === "true"
+              ? player.get("shuffle").queueOld
+              : "";
+
           return {
             code: d.util.setCode(data),
           };
@@ -656,26 +842,39 @@ class lavalinkManager extends EventEmitter {
         code: async (d) => {
           const data = await d.util.aoiFunc(d);
 
-          const [returnQueue = "false", returnShuffledQueue = "false"] = data.inside.splits;
-      
+          const [returnQueue = "false", returnShuffledQueue = "false"] =
+            data.inside.splits;
+
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
 
           const shuffle = player?.get("shuffle") || undefined;
-          if (shuffle?.enabled !== true) { data.result = undefined; return { code: d.util.setCode(data) }}
+          if (shuffle?.enabled !== true) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
 
           for (const track of shuffle.queueOld) {
             await player.queue.add(track);
           }
 
           player.set("shuffle", {
-            queueOld: player.queue.map(track => track),
+            queueOld: player.queue.map((track) => track),
             enabled: true,
-          })
-    
-          data.result = returnQueue === "true" ? player.queue : returnShuffledQueue === "true" ? player.get("shuffle").queueOld : "";
-  
+          });
+
+          data.result =
+            returnQueue === "true"
+              ? player.queue
+              : returnShuffledQueue === "true"
+              ? player.get("shuffle").queueOld
+              : "";
+
           return {
             code: d.util.setCode(data),
           };
@@ -688,13 +887,17 @@ class lavalinkManager extends EventEmitter {
         type: "djs",
         code: async (d) => {
           const data = await d.util.aoiFunc(d);
-      
+
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
-  
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
+
           await player.queue.clear();
-  
+
           data.result = "";
 
           return {
@@ -711,30 +914,46 @@ class lavalinkManager extends EventEmitter {
           const data = await d.util.aoiFunc(d);
 
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
 
-          let [limit, separator = ",\n", format = "{title} requested by {requester}"] = data.inside.splits;
+          let [
+            limit,
+            separator = ",\n",
+            format = "{title} requested by {requester}",
+          ] = data.inside.splits;
           limit = limit ? parseInt(limit) : player.queue.length;
 
-          data.result = player.queue.slice(0, limit).map(track => {
-            const keys = Object.keys(track).filter(key => key !== "requester");
-            const requester = Object.keys(track.requester);
+          data.result = player.queue
+            .slice(0, limit)
+            .map((track) => {
+              const keys = Object.keys(track).filter(
+                (key) => key !== "requester"
+              );
+              const requester = Object.keys(track.requester);
 
-            keys.forEach(key => {
-              format = format.replace(`{${key}}`, track[key]);
-            });
-            
-            requester.forEach(key => {
-              format = format.replace(`{requester.${key}}`, track.requester[key]);
-              format = format.replace(`{requester}`, track.requester);
-            });
+              keys.forEach((key) => {
+                format = format.replace(`{${key}}`, track[key]);
+              });
 
-            //i know this isnt the best way but i'm too lazy to do it properly currently
-            
-            return format;
-          }).join(separator);
-          
+              requester.forEach((key) => {
+                format = format.replace(
+                  `{requester.${key}}`,
+                  track.requester[key]
+                );
+                format = format.replace(`{requester}`, track.requester);
+              });
+
+              //i know this isnt the best way but i'm too lazy to do it properly currently
+
+              return format;
+            })
+            .join(separator);
+
           return {
             code: d.util.setCode(data),
           };
@@ -753,8 +972,12 @@ class lavalinkManager extends EventEmitter {
           if (!source) return d.aoiError.fnError(d, "custom", {}, "source");
 
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
 
           player.set("autoplay", {
             requester: d.message.author,
@@ -780,15 +1003,21 @@ class lavalinkManager extends EventEmitter {
           const result = await d.client.lavalinkManager.search({ query });
 
           if (index === "all") {
-            data.result = format === "true" ? JSON.stringify(result.tracks, null, 2) : result.tracks;
+            data.result =
+              format === "true"
+                ? JSON.stringify(result.tracks, null, 2)
+                : result.tracks;
           } else {
-            data.result = format === "true" ? JSON.stringify(result.tracks[parseInt(index)], null, 2) : result.tracks[parseInt(index)];
+            data.result =
+              format === "true"
+                ? JSON.stringify(result.tracks[parseInt(index)], null, 2)
+                : result.tracks[parseInt(index)];
           }
 
           return {
             code: d.util.setCode(data),
           };
-        }
+        },
       },
       {
         name: "$pauseTrack",
@@ -796,20 +1025,24 @@ class lavalinkManager extends EventEmitter {
         code: async (d) => {
           const data = await d.util.aoiFunc(d);
 
-          const [ returnState = "false"] = data.inside.splits;
+          const [returnState = "false"] = data.inside.splits;
 
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
 
-          await player.pause(true)
+          await player.pause(true);
 
           data.result = returnState === "true" ? player.paused : "";
 
           return {
             code: d.util.setCode(data),
           };
-        }
+        },
       },
       {
         name: "$resumeTrack",
@@ -817,20 +1050,24 @@ class lavalinkManager extends EventEmitter {
         code: async (d) => {
           const data = await d.util.aoiFunc(d);
 
-          const [ returnState = "false"] = data.inside.splits;
+          const [returnState = "false"] = data.inside.splits;
 
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
 
-          await player.pause(false)
+          await player.pause(false);
 
           data.result = returnState === "true" ? player.paused : "";
 
           return {
             code: d.util.setCode(data),
           };
-        }
+        },
       },
       {
         name: "$leaveVoice",
@@ -839,10 +1076,12 @@ class lavalinkManager extends EventEmitter {
           const data = await d.util.aoiFunc(d);
 
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
-          
-          console.log(d.message.guild.me);
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
 
           await player.queue.clear();
           await player.destroy();
@@ -853,7 +1092,7 @@ class lavalinkManager extends EventEmitter {
           return {
             code: d.util.setCode(data),
           };
-        }
+        },
       },
       {
         name: "$voicePing",
@@ -862,15 +1101,19 @@ class lavalinkManager extends EventEmitter {
           const data = await d.util.aoiFunc(d);
 
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
 
           data.result = player.wsPing;
 
           return {
             code: d.util.setCode(data),
           };
-        }
+        },
       },
       {
         name: "$lavalinkPing",
@@ -879,15 +1122,19 @@ class lavalinkManager extends EventEmitter {
           const data = await d.util.aoiFunc(d);
 
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
 
           data.result = player.ping;
 
           return {
             code: d.util.setCode(data),
           };
-        }
+        },
       },
       {
         name: "$playerStatus",
@@ -896,16 +1143,20 @@ class lavalinkManager extends EventEmitter {
           const data = await d.util.aoiFunc(d);
 
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
-          if (!player?.connected) { data.result = undefined; return { code: d.util.setCode(data) }}
+          if (!player)
+            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player?.connected) {
+            data.result = undefined;
+            return { code: d.util.setCode(data) };
+          }
 
           data.result = player?.state;
 
           return {
             code: d.util.setCode(data),
           };
-        }
-      },
+        },
+      }
     );
   }
 }
