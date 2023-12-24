@@ -45,7 +45,8 @@ const lavalink = new lavalinkManager(client, {
   port: 0000, // Server Port
   password: "youshallnotpass", // Lavalink Server Password
   secure: false, // HTTP/HTTPS protocol
-  events: ["trackStart", "trackEnd"] // Array of events that can be used.
+  events: ["trackStart", "trackEnd"], // Array of events that can be used.
+  // debug: true // Used to enable debugging, not pretty but could help to debug your issues.
 });
 
 // Adding events
@@ -53,6 +54,35 @@ lavalink.addEvent("trackStart", {
   code: `$log[Now playing $trackInfo[uri]!]`
 });
 ```
+
+You can also use events in your command handler!
+
+```js
+const loader = new LoadCommands(client);
+loader.load(client.cmd, "./commands");
+```
+
+Then in your file:
+
+`/commands/trackStart.js`
+```js
+module.exports = {
+  name: "some name", // optional!
+  type: `trackStart`,
+  channel: "some channel id", // optional!
+  code: `Some code`
+}
+```
+
+Aoi.js will display a "failed to load" error if you enable logging, but you can disregard that :)
+
+Make sure you add the events to the events: [] in your lavalink setup to make them work.
+
+You can also enable debug mode, to debug your issues. (will display when events are triggered, what events are registered)
+
+`debug: true`
+
+for that in your lavalink setup
 
 ---
 
