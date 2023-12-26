@@ -66,13 +66,12 @@ class lavalinkManager extends EventEmitter {
 
     if (__dir) {
       const events = ["nodeCreate", "nodeReconnect", "nodeDisconnect", "nodeConnect", "nodeError", "nodeRaw", "playerCreate", "playerDestroy", "queueEnd", "playerMove", "playerDisconnect", "trackStart", "trackEnd", "trackStuck", "trackError", "socketClosed"]
-      fs.readdir(__dir, async (err, files) => {
-        if (err) {
-          return console.error(chalk.bgRed.whiteBright(` error `) + ` Failed to load events with reason: ${err}`)
-        }
+      fs.readdir(__dir, async (err, commands) => {
+        if (err) return console.error(`${chalk.red(`•`)} ${chalk.grey(`${(new Date).toLocaleString().split(", ")[1]}`)} Failed to load events with reason: ${err}`)
+
     
-        for (const file of files) {
-          const __path = path.join(__dir, file);
+        for (const command of commands) {
+          const __path = path.join(__dir, command);
           try {
             const event = require(__path);
             if (event && event.type && event.code) {
@@ -86,7 +85,7 @@ class lavalinkManager extends EventEmitter {
               }
             }
           } catch (err) {
-            return console.error(chalk.bgRed.whiteBright(` error `) + ` Failed to load events with reason: ${err}`)
+            return console.error(`${chalk.red(`•`)} ${chalk.grey(`${(new Date).toLocaleString().split(", ")[1]}`)} Failed to load events with reason: ${err}`)
           }
         }
       });
@@ -95,7 +94,7 @@ class lavalinkManager extends EventEmitter {
     this.client.lavalinkManager
       .on("nodeConnect", (node) => {
         console.log(
-          `\r${chalk.bgGreen(" connect ")} Connection to ${chalk.underline.blue(
+          `\r${chalk.green(`•`)} ${chalk.grey(`${(new Date).toLocaleString().split(", ")[1]}`)} Connection to ${chalk.underline.blue(
             node.options.identifier
           )} ${chalk.grey(node.options.host)} succeeded`
         );
@@ -103,27 +102,27 @@ class lavalinkManager extends EventEmitter {
       .on("nodeReconnect", (node) => {
         node.options.retryDelay = node.options.retryDelay + 500;
         console.log(
-          `\r${chalk.bgYellow(
-            ` reconnect ${node.reconnectAttempts + 1} `
+          `\r${chalk.yellow(`•`)} ${chalk.grey(`${(new Date).toLocaleString().split(", ")[1]}`)} ${chalk.grey(
+            `[attempt: ${node.reconnectAttempts}]`
           )} Attempting to reinstate the connection to ${chalk.underline.blue(
             node.options.identifier
-          )} ${chalk.grey(node.options.host)}`
+          )} ${chalk.grey(node.options.host)}.`
         );
 
         if (node.reconnectAttempts >= 6) {
           console.error(
-            `${chalk.bgRed(" destroyed ")} Connection to ${chalk.underline.blue(
+            `\r${chalk.red(`•`)} ${chalk.grey(`${(new Date).toLocaleString().split(", ")[1]}`)} Connection to ${chalk.underline.blue(
               node.options.identifier
-            )} ${chalk.grey(node.options.host)} destroyed.\n`
+            )} ${chalk.grey(node.options.host)} destroyed.`
           );
         }
       })
       .on("nodeDisconnect", (node) => {
-        if (node.reconnectAttempts >= 6) return;
+        if (node.reconnectAttempts > 6) return;
         console.error(
-          `${chalk.bgRed(" disconnect ")} Connection to ${chalk.underline.blue(
+          `${chalk.red(`•`)} ${chalk.grey(`${(new Date).toLocaleString().split(", ")[1]}`)} Connection to ${chalk.underline.blue(
             node.options.identifier
-          )} ${chalk.grey(node.options.host)} disconnected unexpectedly \n`
+          )} ${chalk.grey(node.options.host)} disconnected unexpectedly.`
         );
       })
       .on("queueEnd", async (player) => {
@@ -183,21 +182,9 @@ class lavalinkManager extends EventEmitter {
             this.client.channels.cache.get(this.customEvents[event]?.channel) ||
             this.client.channels.cache.get(player.textChannel) ||
             undefined;
-          if (!code)
-            return console.error(
-              chalk.bgRed(" error ") +
-                ` Event "${event}" triggered but code is ${chalk.gray(
-                  "undefined"
-                )}`
-            );
+          if (!code) return console.error(`${chalk.grey(`• ${(new Date).toLocaleString().split(", ")[1]}`)} Event "${event}" triggered but code is ${chalk.gray("undefined")}`);
           const guild = this.client.guilds.cache.get(player.guild) || undefined;
-          if (!channel || !guild)
-            return console.error(
-              chalk.bgRed(" error ") +
-                ` Event "${event}" triggered but channel or guild is ${chalk.gray(
-                  "undefined"
-                )}`
-            );
+          if (!channel || !guild) return console.error(`${chalk.grey(`• ${(new Date).toLocaleString().split(", ")[1]}`)} Event "${event}" triggered but channel or guild is ${chalk.gray("undefined")}`);
           await this.client.functionManager.interpreter(
             this.client,
             {
@@ -214,7 +201,7 @@ class lavalinkManager extends EventEmitter {
             channel,
             true
           );
-          if (Boolean(this.options.debug) === true) console.log(`Event "${event}" triggered`);
+          if (Boolean(this.options.debug) === true) console.log(`${chalk.grey(`• ${(new Date).toLocaleString().split(", ")[1]}`)} Event "${event}" triggered`);
         }
       );
     });
@@ -226,7 +213,7 @@ class lavalinkManager extends EventEmitter {
     });
 
     this.client.lavalinkManager.commands = this.customEvents;
-    if (Boolean(this.options.debug) === true && this.customEvents.length !== 0) console.log(chalk.bgGreen(" custom events ") + ` Loaded ${Object.keys(this.client.lavalinkManager.commands).length} custom events`);
+    if (Boolean(this.options.debug) === true && this.customEvents.length !== 0) console.log(`${chalk.grey(`• ${(new Date).toLocaleString().split(", ")[1]}`)} Loaded ${Object.keys(this.client.lavalinkManager.commands).length} custom events`);
 
     this.client.on("raw", (data) => {
       switch (data.t) {
