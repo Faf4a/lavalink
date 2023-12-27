@@ -1,6 +1,6 @@
 {
   "name": "aoi.js-lavalink",
-  "version": "0.0.2",
+  "version": "0.0.22",
   "description": "Package used to connect to lavalink with aoi.js easily.",
   "main": "./classes/lavalinkClient.js",
   "scripts": {

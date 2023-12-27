@@ -100,7 +100,7 @@ class lavalinkManager extends EventEmitter {
         );
       })
       .on("nodeReconnect", (node) => {
-        node.options.retryDelay = node.options.retryDelay + 500;
+        node.options.retryDelay += 500;
         console.log(
           `\r${chalk.yellow(`•`)} ${chalk.grey(`${(new Date).toLocaleString().split(", ")[1]}`)} ${chalk.grey(
             `[attempt: ${node.reconnectAttempts}]`
@@ -174,6 +174,7 @@ class lavalinkManager extends EventEmitter {
       });
 
     this.events.forEach((event) => {
+      this.client.cmd.types.push(event);
       this.client.lavalinkManager.on(
         event,
         async (player, node, reason, payload, initChannel, newChannel) => {
@@ -189,7 +190,7 @@ class lavalinkManager extends EventEmitter {
             this.client,
             {
               guild,
-              author: player.queue?.current.requester || undefined,
+              author: player.queue?.current?.requester || undefined,
               channel: channel || undefined,
             },
             [],
@@ -314,13 +315,13 @@ class lavalinkManager extends EventEmitter {
 
           if (playlist) {
             if (!result.tracks.length) {
-              data.result = undefined;
+              data.result = false;
               return { code: d.util.setCode(data) };
             }
             await player.queue.add([...result.tracks]);
           } else {
             if (!result.tracks[0]) {
-              data.result = undefined;
+              data.result = false;
               return { code: d.util.setCode(data) };
             }
             await player.queue.add(result.tracks[0]);
@@ -389,7 +390,7 @@ class lavalinkManager extends EventEmitter {
           if (!player)
             return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
@@ -419,7 +420,7 @@ class lavalinkManager extends EventEmitter {
           if (!player)
             return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
@@ -447,10 +448,10 @@ class lavalinkManager extends EventEmitter {
           if (!player)
             return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
-          //if (player.queue.length < 1) { data.result = undefined; return { code: d.util.setCode(data) }}
+          //if (player.queue.length < 1) { data.result = false; return { code: d.util.setCode(data) }}
 
           if (player?.get("autoplay")?.enabled === true) {
             await player.set("autoplay", {
@@ -486,11 +487,11 @@ class lavalinkManager extends EventEmitter {
           if (!player)
             return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
           if (player.queue.length < 1) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
@@ -528,28 +529,25 @@ class lavalinkManager extends EventEmitter {
           if (!ms) return d.aoiError.fnError(d, "custom", {}, "ms");
 
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player)
-            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
-          if (player.queue?.length < 1) {
-            data.result = undefined;
+
+          if (player.queue?.current?.isSeekable === false) {
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
-          if (player.queue?.current.isSeekable === false) {
-            data.result = undefined;
-            return { code: d.util.setCode(data) };
-          }
-          if (player.queue?.current.length > ms) {
-            data.result = undefined;
+
+          if (player.queue?.current?.duration < ms) {
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
           await player.seek(ms);
 
-          data.result = "";
+          data.result = true;
 
           return {
             code: d.util.setCode(data),
@@ -574,15 +572,15 @@ class lavalinkManager extends EventEmitter {
           if (!player)
             return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
           if (player.queue?.length < 1) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
           if (player.queue?.lenght < position) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
@@ -611,7 +609,7 @@ class lavalinkManager extends EventEmitter {
           if (!player)
             return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
@@ -635,7 +633,7 @@ class lavalinkManager extends EventEmitter {
           if (!player)
             return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
@@ -715,8 +713,7 @@ class lavalinkManager extends EventEmitter {
             }
           });
 
-          data.result =
-            returnFilters === "true" ? JSON.stringify(player.filters) : "";
+          data.result = returnFilters === "true" ? JSON.stringify(player.filters) : "";
 
           return {
             code: d.util.setCode(data),
@@ -732,10 +729,9 @@ class lavalinkManager extends EventEmitter {
           const data = await d.util.aoiFunc(d);
 
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player)
-            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
@@ -763,10 +759,9 @@ class lavalinkManager extends EventEmitter {
           if (!volume) return d.aoiError.fnError(d, "custom", {}, "volume");
 
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player)
-            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
@@ -798,7 +793,7 @@ class lavalinkManager extends EventEmitter {
           if (!player)
             return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
@@ -836,13 +831,13 @@ class lavalinkManager extends EventEmitter {
           if (!player)
             return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
           const shuffle = player?.get("shuffle") || undefined;
           if (shuffle?.enabled !== true) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
@@ -879,7 +874,7 @@ class lavalinkManager extends EventEmitter {
           if (!player)
             return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
@@ -904,7 +899,7 @@ class lavalinkManager extends EventEmitter {
           if (!player)
             return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
@@ -935,8 +930,6 @@ class lavalinkManager extends EventEmitter {
                 format = format.replace(`{requester}`, track.requester);
               });
 
-              //i know this isnt the best way but i'm too lazy to do it properly currently
-
               return format;
             })
             .join(separator);
@@ -962,7 +955,7 @@ class lavalinkManager extends EventEmitter {
           if (!player)
             return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
@@ -985,7 +978,7 @@ class lavalinkManager extends EventEmitter {
         type: "djs",
         code: async (d) => {
           const data = await d.util.aoiFunc(d);
-          const [query, index = "0", format = "false"] = data.inside.splits;
+          const [query, index = "0", returnAll = "false"] = data.inside.splits;
 
           const result = await d.client.lavalinkManager.search({ query });
 
@@ -995,10 +988,7 @@ class lavalinkManager extends EventEmitter {
                 ? JSON.stringify(result.tracks, null, 2)
                 : result.tracks;
           } else {
-            data.result =
-              format === "true"
-                ? JSON.stringify(result.tracks[parseInt(index)], null, 2)
-                : result.tracks[parseInt(index)];
+            data.result = returnAll === "true" ? result.tracks : JSON.stringify(result.tracks[parseInt(index)], null, 2)
           }
 
           return {
@@ -1015,10 +1005,9 @@ class lavalinkManager extends EventEmitter {
           const [returnState = "false"] = data.inside.splits;
 
           const player = await d.client.lavalinkManager.players.get(d.guild.id);
-          if (!player)
-            return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
+          if (!player) return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
@@ -1043,7 +1032,7 @@ class lavalinkManager extends EventEmitter {
           if (!player)
             return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
@@ -1066,7 +1055,7 @@ class lavalinkManager extends EventEmitter {
           if (!player)
             return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
@@ -1091,7 +1080,7 @@ class lavalinkManager extends EventEmitter {
           if (!player)
             return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
@@ -1112,7 +1101,7 @@ class lavalinkManager extends EventEmitter {
           if (!player)
             return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
@@ -1133,7 +1122,7 @@ class lavalinkManager extends EventEmitter {
           if (!player)
             return d.aoiError.fnError(d, "custom", {}, "No lavalink instance");
           if (!player?.connected) {
-            data.result = undefined;
+            data.result = false;
             return { code: d.util.setCode(data) };
           }
 
