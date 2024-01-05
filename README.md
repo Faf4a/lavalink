@@ -55,6 +55,8 @@ lavalink.addEvent("trackStart", {
 });
 ```
 
+(No lavalink server? https://lavalink.moebot.pro/non-ssl check this out!)
+
 You can also use events in your command handler!
 
 ```js
