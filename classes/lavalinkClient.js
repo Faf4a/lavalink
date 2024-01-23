@@ -109,7 +109,7 @@ class lavalinkManager extends EventEmitter {
           )} ${chalk.grey(node.options.host)}.`
         );
 
-        if (node.reconnectAttempts >= 6) {
+        if (node.reconnectAttempts >= this.options.retryAmount) {
           console.error(
             `\r${chalk.red(`•`)} ${chalk.grey(`${(new Date).toLocaleString().split(", ")[1]}`)} Connection to ${chalk.underline.blue(
               node.options.identifier
