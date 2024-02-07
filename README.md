@@ -90,10 +90,6 @@ for that in your lavalink setup
 
 ### Functions
 
-Absolutely! Here's the comprehensive list of all the functions in a modern README.md style:
-
-### Music Player Functions
-
 #### $joinVoice
 Connects the bot to a specified voice channel.
 
