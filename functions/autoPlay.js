@@ -1,5 +1,6 @@
-async function autoPlayFunction(player, previousTrack, client) {
+async function autoPlay(player, previousTrack) {
 
+  if (player.get("autoplay") !== true) return;
   if (!previousTrack) return;
 
   if (previousTrack.info.sourceName === "spotify") {
@@ -30,7 +31,7 @@ async function autoPlayFunction(player, previousTrack, client) {
         .catch(console.warn);
       if (res && res.tracks.length)
         await player.queue.add(
-          res.tracks.slice(0, 5).map((track) => {
+          res.tracks.slice(0, 1).map((track) => {
             track.pluginInfo.clientData = {
               ...(track.pluginInfo.clientData || {}),
               fromAutoplay: true,
@@ -59,7 +60,7 @@ async function autoPlayFunction(player, previousTrack, client) {
       .catch(console.warn);
     if (res && res.tracks.length)
       await player.queue.add(
-        res.tracks.slice(0, 5).map((track) => {
+        res.tracks.slice(0, 1).map((track) => {
           track.pluginInfo.clientData = {
             ...(track.pluginInfo.clientData || {}),
             fromAutoplay: true,
@@ -69,11 +70,11 @@ async function autoPlayFunction(player, previousTrack, client) {
       );
   }
 
-  if (!player.playing || player.queue.tracks.length !== 0) await player.play({ volume: client.lavalinkClient.config.defaultVolume, paused: false });
+  if (!player.playing || player.queue.tracks.length !== 0) await player.play({ volume: player.get("default_volume") || 100, paused: false });
 
   return;
 }
 
-module.exports = autoPlayFunction
+module.exports = autoPlay
 
 // Modified from https://github.com/Tomato6966/lavalink-client/blob/main/testBot/Utils/OptionalFunctions.ts
